@@ -2,6 +2,7 @@ package org.learningconcurrency
 package ch2
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 object Exercises extends App {
   def parallel[A, B](a: => A, b: => B): (A, B) = {
@@ -113,6 +114,41 @@ object Exercises extends App {
   thread {
     for (i <- 0 until 15) {
       syncVarWait.putWait(i)
+    }
+  }
+
+  class SyncQueue[T](n: Int) {
+    private var queue: mutable.Queue[T] = new mutable.Queue[T]()
+
+    def get(): T = this.synchronized {
+      while (queue.isEmpty) this.wait()
+      val result = queue.dequeue()
+      this.notify()
+      result
+    }
+
+    def put(t: T): Unit = this.synchronized {
+      while (queue.size == n) this.wait()
+      queue.enqueue(t)
+      this.notify()
+    }
+  }
+
+  val syncQueue = new SyncQueue[Int](10)
+
+  thread {
+    @tailrec
+    def printValue: Unit = {
+      val value = syncQueue.get()
+      log(s"queue value = $value")
+      printValue
+    }
+    printValue
+  }
+
+  thread {
+    for (i <- 0 until 10000) {
+      syncQueue.put(i)
     }
   }
 }
