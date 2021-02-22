@@ -1,6 +1,8 @@
 package org.learningconcurrency
 package ch2
 
+import org.learningconcurrency.ch2.SynchronizedNesting.Account
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 
@@ -147,8 +149,45 @@ object Exercises extends App {
   }
 
   thread {
-    for (i <- 0 until 10000) {
+    for (i <- 0 until 10) {
       syncQueue.put(i)
     }
   }
+
+  // Exercise 7
+  def send(a1: Account, a2: Account, n: Int): Unit = {
+    def adjust: Unit = {
+      a1.money -= n
+      a2.money += n
+    }
+    if (a1.name < a2.name) a1.synchronized { a2.synchronized { adjust }}
+    else a2.synchronized { a1.synchronized { adjust }}
+  }
+  def sendAll(accounts: Set[Account], target: Account): Unit = {
+//    accounts.foreach(account => send(account, target, account.money))
+    def adjust: Unit = {
+      target.money = accounts.foldLeft(0)((s, a) => {
+        val money = a.money
+        a.money = 0
+        s + money
+      })
+    }
+
+    def sendAllSync(accounts: List[Account]): Unit = accounts match {
+      case h :: t => h synchronized {
+        sendAllSync(t)
+      }
+      case _ => adjust
+    }
+
+    sendAllSync((target :: accounts.toList).sortBy(_.name))
+  }
+
+  val accounts = (1 to 100).map(i => new Account(s"Account: $i", i * 10)).toSet
+  val target = new Account("Target account", 0)
+
+  sendAll(accounts, target)
+
+  accounts.foreach(a => log(s"${a.name}, money = ${a.money}"))
+  log(s"${target.name} - money = ${target.money}")
 }
